@@ -59,6 +59,11 @@ export interface SynthesisData {
     learned: string;
 }
 
+export interface SpeedBumpData {
+    checkpointId: string; // Or index
+    reflection: string;
+}
+
 export interface Submission {
     id: string;
     assignmentId: string;
@@ -66,6 +71,7 @@ export interface Submission {
     classId: string;
     airlockData: AirlockData;
     annotations: AnnotationData[];
+    speedBumpReflections?: SpeedBumpData[]; // Added this
     synthesis: SynthesisData;
     submittedAt: number | object; // Firestore Timestamp
     status: 'Completed';

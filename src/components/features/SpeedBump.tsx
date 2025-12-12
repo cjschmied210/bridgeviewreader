@@ -4,15 +4,17 @@ import { AlertCircle, CheckCircle } from 'lucide-react';
 
 interface SpeedBumpProps {
     children: React.ReactNode;
+    onUnlock?: (reflection: string) => void;
 }
 
-export function SpeedBump({ children }: SpeedBumpProps) {
+export function SpeedBump({ children, onUnlock }: SpeedBumpProps) {
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [reflection, setReflection] = useState('');
 
     const handleUnlock = () => {
         if (reflection.length > 10) {
             setIsUnlocked(true);
+            if (onUnlock) onUnlock(reflection);
         }
     };
 

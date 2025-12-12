@@ -4,26 +4,87 @@
 import { useAuth } from '@/context/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { LogIn, BookOpen, GraduationCap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { LogIn, BookOpen, GraduationCap, School } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function LandingPage() {
   const { user, signInWithGoogle, loading: authLoading } = useAuth();
   const { role, loading: roleLoading } = useUserRole();
   const router = useRouter();
+  const [isSelectingRole, setIsSelectingRole] = useState(false);
 
   useEffect(() => {
+    // If we have a user and a role, redirect correctly
     if (user && role) {
       if (role === 'teacher') {
         router.push('/dashboard');
       } else {
         router.push('/portal');
       }
+    } else if (user && !roleLoading && !role) {
+      // User is logged in but no role found -> Show selection
+      setIsSelectingRole(true);
     }
-  }, [user, role, router]);
+  }, [user, role, roleLoading, router]);
+
+  const handleRoleSelection = async (selectedRole: 'student' | 'teacher') => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        role: selectedRole,
+        createdAt: serverTimestamp(),
+      });
+      // Force reload or just let the real-time hook pick it up (might need a trigger)
+      // For simplicity, we can reload to trigger the hook again or wait for the hook to update if it was listening (it uses getDoc so it won't auto-update).
+      // Ideally useUserRole should be a snapshot listener or we manually refresh.
+      // Let's just reload for MVP robustness.
+      window.location.reload();
+    } catch (error) {
+      console.error("Error creating profile:", error);
+    }
+  };
 
   if (authLoading || roleLoading) {
     return <div className="flex items-center justify-center min-h-screen bg-[#FDFBF7] text-stone-400 font-serif">Loading...</div>;
+  }
+
+  // Onboarding View
+  if (isSelectingRole) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-8">
+        <div className="max-w-md w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8">
+          <h1 className="text-3xl font-serif font-bold text-stone-900">Welcome, {user?.displayName?.split(' ')[0]}</h1>
+          <p className="text-stone-600">Please select your role to continue.</p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => handleRoleSelection('student')}
+              className="p-6 bg-white border border-stone-200 rounded-xl hover:border-blue-400 hover:shadow-lg transition-all flex flex-col items-center gap-4 group"
+            >
+              <div className="p-4 bg-blue-50 text-blue-600 rounded-full group-hover:scale-110 transition-transform">
+                <GraduationCap size={32} />
+              </div>
+              <span className="font-bold text-stone-800">I am a Student</span>
+            </button>
+
+            <button
+              onClick={() => handleRoleSelection('teacher')}
+              className="p-6 bg-white border border-stone-200 rounded-xl hover:border-amber-400 hover:shadow-lg transition-all flex flex-col items-center gap-4 group"
+            >
+              <div className="p-4 bg-amber-50 text-amber-600 rounded-full group-hover:scale-110 transition-transform">
+                <School size={32} />
+              </div>
+              <span className="font-bold text-stone-800">I am a Teacher</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -66,7 +127,7 @@ export default function LandingPage() {
           </div>
           <div className="p-4 rounded-xl bg-white border border-stone-200/60 shadow-sm">
             <div className="flex items-center gap-2 mb-2 text-stone-800 font-bold">
-              <BookOpen size={18} />
+              <School size={18} />
               <h3>For Teachers</h3>
             </div>
             <p className="text-sm text-stone-500">Distribute scaffolding, monitor cognition, and grade with insight.</p>

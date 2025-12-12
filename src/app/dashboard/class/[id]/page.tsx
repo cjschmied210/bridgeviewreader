@@ -153,9 +153,36 @@ export default function ClassDetailPage() {
                     {/* Right Col: Progress / Details */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2 min-h-[400px]">
                         {!selectedStudent ? (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                <User size={48} className="mb-4 opacity-20" />
-                                <p>Select a student to view their progress.</p>
+                            <div className="animate-in fade-in slide-in-from-right-4">
+                                <h2 className="text-xl font-bold text-gray-900 mb-6">Class Assignments</h2>
+                                <div className="space-y-4">
+                                    {assignedTasks.length === 0 ? (
+                                        <p className="text-gray-400 italic">No assignments distributed to this class yet.</p>
+                                    ) : (
+                                        assignedTasks.map((task, idx) => (
+                                            <div key={task.assignmentId} className="border border-gray-200 rounded-lg p-4 flex justify-between items-center bg-gray-50 hover:bg-white transition shadow-sm">
+                                                <div>
+                                                    <h4 className="font-bold text-gray-800 text-lg">Assignment Task {idx + 1}</h4>
+                                                    <p className="text-xs text-gray-400 font-mono mt-1">ID: {task.assignmentId}</p>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => router.push(`/dashboard/class/${id}/heatmap/${task.assignmentId}`)}
+                                                        className="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg font-bold text-sm hover:bg-indigo-100 transition flex items-center gap-2"
+                                                    >
+                                                        <Clock size={16} /> {/* Should be Activity or similar, Clock works for now */}
+                                                        Class Heatmap
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <div className="mt-12 p-8 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-gray-400">
+                                    <User size={32} className="mb-2 opacity-50" />
+                                    <p>Select a student from the roster to view individual progress.</p>
+                                </div>
                             </div>
                         ) : (
                             <div className="animate-in fade-in slide-in-from-right-4">

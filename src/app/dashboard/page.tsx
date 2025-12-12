@@ -79,7 +79,14 @@ export default function TeacherDashboard() {
 
     const handleCreateClass = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user || !newClassName.trim()) return;
+        if (!user) {
+            alert("You must be logged in to create a class.");
+            return;
+        }
+        if (!newClassName.trim()) {
+            alert("Please enter a class name.");
+            return;
+        }
 
         try {
             await addDoc(collection(db, "classes"), {
@@ -91,8 +98,11 @@ export default function TeacherDashboard() {
             setNewClassName("");
             setIsCreatingClass(false);
             fetchClasses();
-        } catch (error) {
+            alert("Class created successfully!");
+        } catch (error: any) {
             console.error("Error creating class:", error);
+            // improvements: nice UI toast
+            alert("Error creating class: " + error.message);
         }
     };
 

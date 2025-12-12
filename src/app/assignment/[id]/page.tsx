@@ -8,13 +8,14 @@ import { EntryAirlock } from "@/components/features/EntryAirlock";
 import { TextAnnotator } from "@/components/features/TextAnnotator";
 import { FixUpButton } from "@/components/features/FixUpButton";
 import { SynthesisDashboard } from "@/components/features/SynthesisDashboard";
+import { SpeedBump } from "@/components/features/SpeedBump";
 import { Assignment } from "@/types";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Class as ClassType, AirlockData, AnnotationData, SynthesisData } from "@/types";
+import { Class as ClassType, AirlockData, AnnotationData, SynthesisData, SpeedBumpData } from "@/types";
 import { Loader2 } from "lucide-react";
 
 export default function AssignmentPage() {
@@ -30,10 +31,18 @@ export default function AssignmentPage() {
     const [phase, setPhase] = useState<'AIRLOCK' | 'READING' | 'SYNTHESIS' | 'COMPLETE'>('AIRLOCK');
     const [kwlData, setKwlData] = useState<AirlockData | null>(null);
     const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
+    const [speedBumpReflections, setSpeedBumpReflections] = useState<SpeedBumpData[]>([]);
 
     const handleAirlockComplete = (data: AirlockData) => {
         setKwlData(data);
         setPhase('READING');
+    };
+
+    const handleSpeedBumpUnlock = (index: number, reflection: string) => {
+        setSpeedBumpReflections(prev => [
+            ...prev,
+            { checkpointId: index.toString(), reflection }
+        ]);
     };
 
     // Auth & Assignment Validation
@@ -134,6 +143,7 @@ export default function AssignmentPage() {
                 classId: classId || 'unknown',
                 airlockData: kwlData,
                 annotations: annotations,
+                speedBumpReflections: speedBumpReflections,
                 synthesis: synthesisData,
                 submittedAt: serverTimestamp(),
                 status: 'Completed'
@@ -186,7 +196,22 @@ export default function AssignmentPage() {
             >
                 <div className={`transition-opacity duration-500 ${phase === 'SYNTHESIS' ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
                     <TextAnnotator onAnnotate={handleAnnotate}>
-                        <article dangerouslySetInnerHTML={{ __html: currentAssignment.content }} />
+                        {(() => {
+                            const parts = currentAssignment.content.split('<hr>');
+                            return (
+                                <article className="space-y-8">
+                                    {/* First part is always visible */}
+                                    <div dangerouslySetInnerHTML={{ __html: parts[0] }} />
+
+                                    {/* Subsequent parts are wrapped in SpeedBumps */}
+                                    {parts.slice(1).map((part, index) => (
+                                        <SpeedBump key={index}>
+                                            <div dangerouslySetInnerHTML={{ __html: part }} />
+                                        </SpeedBump>
+                                    ))}
+                                </article>
+                            );
+                        })()}
                         {phase === 'READING' && <FixUpButton />}
 
                         <div className="mt-12 mb-20 flex justify-center">
