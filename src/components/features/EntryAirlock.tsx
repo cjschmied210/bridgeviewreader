@@ -13,60 +13,22 @@ interface EntryAirlockProps {
 }
 
 export function EntryAirlock({ assignment, onComplete }: EntryAirlockProps) {
-    const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // Scavenger Hunt is step 3, Role Selection is step 4
+    const [step, setStep] = useState<1 | 2 | 3>(1); // Role Selection is now step 3
     const [selectedRole, setSelectedRole] = useState<AirlockData['role']>();
     const [primingWords, setPrimingWords] = useState(['', '', '']);
     const [knowledge, setKnowledge] = useState('');
     const [curiosity, setCuriosity] = useState('');
 
-    // Scavenger Hunt State
-    const [cluesFound, setCluesFound] = useState(0);
-    const [foundClueIds, setFoundClueIds] = useState<Set<string>>(new Set());
-
     const handleNext = () => {
         if (step === 1) setStep(2);
         else if (step === 2) setStep(3);
-        else if (step === 3) setStep(4);
         else {
             onComplete({
                 primingWords,
-
                 knowledge,
                 curiosity,
                 role: selectedRole
             });
-        }
-    };
-
-
-    const handleClueClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        const target = e.target as HTMLElement;
-        // Check if the clicked element is a heading or image
-        if (/^H[1-6]$/.test(target.tagName) || target.tagName === 'IMG') {
-            const id = target.innerText || (target as HTMLImageElement).src || target.tagName + Math.random();
-
-            if (!foundClueIds.has(id)) {
-                // Determine if this is a valid "clue" (heading or image)
-                // We add a visual indicator class to the target
-                target.style.color = '#059669'; // Emerald 600
-                target.style.position = 'relative';
-
-                // Add a checkmark if not present
-                if (!target.querySelector('.clue-found-badge')) {
-                    const badge = document.createElement('span');
-                    badge.className = 'clue-found-badge';
-                    badge.innerHTML = '✓';
-                    badge.style.marginLeft = '8px';
-                    badge.style.display = 'inline-block';
-                    badge.style.color = '#059669';
-                    target.appendChild(badge);
-                }
-
-                const newSet = new Set(foundClueIds);
-                newSet.add(id);
-                setFoundClueIds(newSet);
-                setCluesFound(prev => Math.min(prev + 1, 3));
-            }
         }
     };
 
@@ -75,8 +37,7 @@ export function EntryAirlock({ assignment, onComplete }: EntryAirlockProps) {
         switch (step) {
             case 1: return 'Visual Priming';
             case 2: return 'Activate Schema';
-            case 3: return 'Scavenger Hunt';
-            case 4: return 'Role Selection';
+            case 3: return 'Role Selection';
         }
     };
 
@@ -84,8 +45,7 @@ export function EntryAirlock({ assignment, onComplete }: EntryAirlockProps) {
         switch (step) {
             case 1: return <ImageIcon size={20} />;
             case 2: return <Brain size={20} />;
-            case 3: return <Search size={20} />;
-            case 4: return <User size={20} />;
+            case 3: return <User size={20} />;
         }
     };
 
@@ -109,7 +69,7 @@ export function EntryAirlock({ assignment, onComplete }: EntryAirlockProps) {
                         </div>
                     </div>
                     <div className="text-stone-400 text-xs font-mono uppercase tracking-widest">
-                        Step {step} / 4
+                        Step {step} / 3
                     </div>
                 </div>
 
@@ -117,27 +77,44 @@ export function EntryAirlock({ assignment, onComplete }: EntryAirlockProps) {
                 <div className="p-8 overflow-y-auto custom-scrollbar">
                     {step === 1 && (
                         <div className="space-y-6">
-                            <div className="aspect-video bg-stone-200 rounded-lg flex items-center justify-center overflow-hidden relative group">
-                                <Image
-                                    src={assignment.imageUrl || `https://loremflickr.com/1600/900/${encodeURIComponent(assignment.themeImageKeyword)}`}
-                                    alt={`Visual priming for ${assignment.title}`}
-                                    fill
-                                    unoptimized // Since we are using an external source that redirects
-                                    className="absolute inset-0 object-cover transition-transform duration-700 group-hover:scale-105"
-                                    onError={(e) => {
-                                        // Fallback logic not directly supported in Next Image onError the same way for style
-                                        // But for a linter fix, replacing img is the goal.
-                                        // Ideally we handle error state with state, but keeping it simple for now.
-                                        const target = e.target as HTMLImageElement;
-                                        target.style.display = 'none';
-                                        target.parentElement?.classList.add('bg-stone-300');
-                                    }}
-                                />
-                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
-                                <p className="relative z-10 text-white/90 font-medium flex items-center gap-2 drop-shadow-md">
-                                    <ImageIcon size={24} />
-                                    <span>Visual Priming: {assignment.themeImageKeyword}</span>
-                                </p>
+                            <div className="grid grid-cols-2 gap-4">
+                                {(() => {
+                                    // 1. Determine Queries
+                                    let queries = assignment.visualPrimingQueries;
+
+                                    // Fallback Heuristic if no queries provided
+                                    if (!queries || queries.length === 0) {
+                                        // Simple heuristic: Use theme keyword + split title words
+                                        queries = [
+                                            assignment.themeImageKeyword,
+                                            ...assignment.title.split(' ').filter(w => w.length > 4).slice(0, 3)
+                                        ];
+                                    }
+
+                                    // Limit to 4 images for the grid
+                                    const displayQueries = queries.slice(0, 4);
+
+                                    return displayQueries.map((query, index) => (
+                                        <div key={index} className="aspect-video bg-stone-200 rounded-lg flex items-center justify-center overflow-hidden relative group">
+                                            <Image
+                                                src={`https://loremflickr.com/800/600/${encodeURIComponent(query)}?random=${index}`}
+                                                alt={`Visual priming: ${query}`}
+                                                fill
+                                                unoptimized
+                                                className="absolute inset-0 object-cover transition-transform duration-700 group-hover:scale-110"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                    target.parentElement?.classList.add('bg-stone-300');
+                                                }}
+                                            />
+                                            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
+                                            <div className="absolute bottom-2 left-2 bg-black/40 px-2 py-1 rounded text-white text-xs backdrop-blur-md">
+                                                {query}
+                                            </div>
+                                        </div>
+                                    ));
+                                })()}
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-stone-700 mb-3 font-sans">
@@ -200,68 +177,6 @@ export function EntryAirlock({ assignment, onComplete }: EntryAirlockProps) {
                     )}
                     {step === 3 && (
                         <div className="space-y-6">
-                            <div className="bg-amber-50 p-4 rounded-lg border border-amber-100 mb-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
-                                <div className="flex gap-3">
-                                    <div className="p-2 bg-amber-100 rounded-full text-amber-700 h-fit">
-                                        <Search size={20} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-amber-900 text-sm">Scavenger Hunt</h3>
-                                        <p className="text-amber-800 text-sm">
-                                            Find and click 3 headings or images to preview the text structure.
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-amber-200 shadow-sm">
-                                    <span className={`font-bold ${cluesFound >= 3 ? 'text-green-600' : 'text-amber-600'}`}>
-                                        {cluesFound} / 3
-                                    </span>
-                                    <span className="text-xs text-stone-500 uppercase font-bold">Found</span>
-                                </div>
-                            </div>
-
-                            <div
-                                className="prose prose-stone max-w-none scavenger-hunt-container p-6 bg-white rounded-lg shadow-inner border border-stone-100"
-                                onClick={handleClueClick}
-                            >
-                                <style jsx global>{`
-                                    .scavenger-hunt-container p,
-                                    .scavenger-hunt-container ul,
-                                    .scavenger-hunt-container ol,
-                                    .scavenger-hunt-container blockquote {
-                                        filter: blur(5px);
-                                        opacity: 0.5;
-                                        pointer-events: none;
-                                        user-select: none;
-                                    }
-                                    .scavenger-hunt-container h1,
-                                    .scavenger-hunt-container h2,
-                                    .scavenger-hunt-container h3,
-                                    .scavenger-hunt-container h4,
-                                    .scavenger-hunt-container img {
-                                        filter: none;
-                                        cursor: pointer;
-                                        transition: all 0.2s ease;
-                                        position: relative;
-                                    }
-                                    .scavenger-hunt-container h1:hover,
-                                    .scavenger-hunt-container h2:hover,
-                                    .scavenger-hunt-container h3:hover,
-                                    .scavenger-hunt-container img:hover {
-                                        transform: scale(1.01);
-                                        background-color: rgba(253, 251, 247, 0.5);
-                                        outline: 2px dashed #d97706;
-                                        outline-offset: 4px;
-                                        border-radius: 4px;
-                                    }
-                                `}</style>
-                                <div dangerouslySetInnerHTML={{ __html: assignment.content }} />
-                            </div>
-                        </div>
-                    )}
-
-                    {step === 4 && (
-                        <div className="space-y-6">
                             <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 mb-6">
                                 <p className="text-purple-800 text-sm flex gap-2">
                                     <User size={18} className="shrink-0" />
@@ -322,13 +237,9 @@ export function EntryAirlock({ assignment, onComplete }: EntryAirlockProps) {
                 <div className="bg-stone-50 p-6 border-t border-stone-200 flex justify-end shrink-0">
                     <button
                         onClick={handleNext}
-                        disabled={step === 3 && cluesFound < 3}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all font-medium  ${step === 3 && cluesFound < 3
-                            ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
-                            : 'bg-stone-800 text-[#FDFBF7] hover:bg-stone-700 hover:pr-8 hover:pl-4'
-                            }`}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all font-medium bg-stone-800 text-[#FDFBF7] hover:bg-stone-700 hover:pr-8 hover:pl-4`}
                     >
-                        {step === 4 ? 'Enter Text' : 'Next Step'}
+                        {step === 3 ? 'Enter Text' : 'Next Step'}
                         <ArrowRight size={18} />
                     </button>
                 </div>

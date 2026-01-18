@@ -40,6 +40,7 @@ export interface Assignment {
     contentSimple?: string; // HTML content (Simplified/Lexile-Adjusted)
     description?: string;
     imageUrl?: string; // Specific image URL to override keyword search
+    visualPrimingQueries?: string[]; // Array of specific queries for the priming gallery
 }
 
 export interface AirlockData {

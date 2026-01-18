@@ -102,7 +102,8 @@ export const assignments: Assignment[] = [
       <p class="mb-4">
          [Placeholder Text: More simplified Latin text would appear here.]
       </p>
-    `
+    `,
+    visualPrimingQueries: ["Old Library", "Brain Synapses", "Open Book", "Reading Nook"]
   },
   {
     id: "2",
@@ -138,6 +139,7 @@ export const assignments: Assignment[] = [
           This changed how people lived. Most people's lives were different. People had more money and there were more people in the world.
       </p>
     `,
-    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Powerloom_weaving_in_1835.jpg/1280px-Powerloom_weaving_in_1835.jpg"
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Powerloom_weaving_in_1835.jpg/1280px-Powerloom_weaving_in_1835.jpg",
+    visualPrimingQueries: ["Steam train 1800s", "Industrial Factory Interior", "Cotton Loom", "Victorian London Crowds"]
   }
 ];

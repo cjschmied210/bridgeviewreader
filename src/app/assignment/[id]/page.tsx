@@ -97,17 +97,80 @@ export default function AssignmentPage() {
             </article>
         );
     }, [currentAssignment, isSpanish, isSimplified]); // Added dependency
+    // Saving State
+    const [saving, setSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+    // Sync Helper
+    const syncSubmissionState = async (partialData: Partial<Submission>) => {
+        if (!user || !currentAssignment) return;
+        setSaving(true);
+        try {
+            const submissionRef = existingSubmission
+                ? doc(db, "submissions", existingSubmission.id)
+                : collection(db, "submissions"); // logic needs to handle create/update differentiation slightly differently
+
+            const basePayload = {
+                ...partialData,
+                lastRevisedAt: serverTimestamp(),
+            };
+
+            // If we have an ID, update. If not, create.
+            if (existingSubmission) {
+                await updateDoc(doc(db, "submissions", existingSubmission.id), basePayload);
+                // Update local state to reflect changes if needed (React ref updates or specific state)
+            } else {
+                // Create new
+                // We need full payload for create, so we merge with defaults
+                const newPayload = {
+                    assignmentId: currentAssignment.id,
+                    studentId: user.uid,
+                    classId: classId || 'unknown',
+                    status: 'In Progress',
+                    submittedAt: null,
+                    airlockData: kwlData,
+                    annotations: annotations,
+                    speedBumpReflections: speedBumpReflections,
+                    synthesis: { gist: '', reflection1: '', learned: '' }, // Empty default
+                    ...partialData,
+                    createdAt: serverTimestamp()
+                };
+                const docRef = await addDoc(collection(db, "submissions"), newPayload);
+                // Update local existingSubmission so subsequent saves are updates
+                setExistingSubmission({ id: docRef.id, ...newPayload } as any);
+            }
+
+            setLastSaved(new Date());
+        } catch (err) {
+            console.error("Auto-save failed:", err);
+        } finally {
+            setTimeout(() => setSaving(false), 800); // Visual delay for feeling
+        }
+    };
+
     const handleAirlockComplete = (data: AirlockData) => {
         setKwlData(data);
         if (data.role) setReciprocalRole(data.role);
         setPhase('READING');
+
+        // Auto-save Airlock data
+        syncSubmissionState({
+            airlockData: data,
+            status: 'In Progress'
+        });
     };
 
     const handleSpeedBumpUnlock = (index: number, reflection: string) => {
-        setSpeedBumpReflections(prev => [
-            ...prev,
+        const newReflections = [
+            ...speedBumpReflections,
             { checkpointId: index.toString(), reflection }
-        ]);
+        ];
+        setSpeedBumpReflections(newReflections);
+
+        // Auto-save SpeedBump
+        syncSubmissionState({
+            speedBumpReflections: newReflections
+        });
     };
 
     const handleAnnotationClick = (id: string) => {
@@ -197,10 +260,11 @@ export default function AssignmentPage() {
         fetchAssignmentAndValidate();
     }, [id, user, role, authLoading, roleLoading, router]); // Keep dependencies minimal for fetch
 
-    // Handle Phase Navigation via URL
+    // Handle Phase Navigation and Hydration
     useEffect(() => {
         if (!existingSubmission) return;
 
+        // If specific phase requested via URL, respect it
         if (requestedPhase === 'AIRLOCK') {
             setPhase('AIRLOCK');
         } else if (requestedPhase === 'READING') {
@@ -208,9 +272,20 @@ export default function AssignmentPage() {
         } else if (requestedPhase === 'SYNTHESIS') {
             setPhase('SYNTHESIS');
         } else {
-            // If no phase is specified but we have a submission, default to READING
-            // This happens on initial load or if navigating to the base assignment URL
-            setPhase('READING');
+            // Smart Hydration:
+            // If Synthesis is done, go to Complete (or Synthesis view)
+            if (existingSubmission.status === 'Completed') {
+                setPhase('COMPLETE'); // Or show grading report
+            }
+            // If Airlock is done but Synthesis isn't, go to READING
+            else if (existingSubmission.airlockData && !existingSubmission.synthesis?.gist) {
+                setPhase('READING');
+            }
+            // If Synthesis started (rare case if partial save implemented there), go to SYNTHESIS
+            else if (existingSubmission.synthesis?.gist) {
+                setPhase('SYNTHESIS');
+            }
+            // Default fallthrough logic handled by initial state ('AIRLOCK') unless we explicitly see progress
         }
     }, [requestedPhase, existingSubmission]);
 
@@ -324,8 +399,14 @@ export default function AssignmentPage() {
     }
 
     const handleAnnotate = (annotation: AnnotationData) => {
-        setAnnotations([...annotations, annotation]);
+        const newAnnotations = [...annotations, annotation];
+        setAnnotations(newAnnotations);
         awardXP('DeepReader', 5);
+
+        // Auto-save Annotation
+        syncSubmissionState({
+            annotations: newAnnotations
+        });
     };
 
     const handleFinishReading = () => {
@@ -539,37 +620,43 @@ export default function AssignmentPage() {
 
                     {/* Access Tools Control Bar */}
                     {phase === 'READING' && (
-                        <div className="flex justify-end gap-2 mb-4 sticky top-0 z-40 bg-[#FDFBF7]/80 backdrop-blur-sm p-2 rounded-xl">
-                            <button
-                                onClick={() => setIsSpanish(!isSpanish)}
-                                disabled={!currentAssignment.contentEs} // Disable if no Spanish content
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-xs font-bold ${isSpanish ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'} ${!currentAssignment.contentEs ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                title={!currentAssignment.contentEs ? "No Spanish translation available" : "Toggle English/Spanish"}
-                            >
-                                <Languages size={14} />
-                                {isSpanish ? 'Español' : 'English'}
-                            </button>
+                        <div className="flex flex-col items-end sticky top-0 z-40">
+                            {/* Saving Indicator */}
+                            <div className={`text-xs font-bold font-mono transition-opacity duration-500 mb-1 px-2 ${saving || lastSaved ? 'opacity-100' : 'opacity-0'} ${saving ? 'text-amber-500' : 'text-stone-300'}`}>
+                                {saving ? 'Saving...' : 'Saved'}
+                            </div>
 
-                            <button
-                                onClick={() => setIsSimplified(!isSimplified)}
-                                disabled={isSpanish || !currentAssignment.contentSimple}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-xs font-bold 
+                            <div className="flex justify-end gap-2 mb-4 bg-[#FDFBF7]/80 backdrop-blur-sm p-2 rounded-xl border border-white/50 shadow-sm">
+                                <button
+                                    onClick={() => setIsSpanish(!isSpanish)}
+                                    disabled={!currentAssignment.contentEs} // Disable if no Spanish content
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-xs font-bold ${isSpanish ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'} ${!currentAssignment.contentEs ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    title={!currentAssignment.contentEs ? "No Spanish translation available" : "Toggle English/Spanish"}
+                                >
+                                    <Languages size={14} />
+                                    {isSpanish ? 'Español' : 'English'}
+                                </button>
+
+                                <button
+                                    onClick={() => setIsSimplified(!isSimplified)}
+                                    disabled={isSpanish || !currentAssignment.contentSimple}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-xs font-bold 
                                     ${isSimplified ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'} 
                                     ${(isSpanish || !currentAssignment.contentSimple) ? 'opacity-50 cursor-not-allowed' : ''}
                                 `}
-                                title={isSpanish ? "Not available in Spanish mode" : (!currentAssignment.contentSimple ? "No simplified version available" : "Toggle Text Complexity")}
-                            >
-                                <SlidersHorizontal size={14} />
-                                {isSimplified ? 'Simplified' : 'Simplify'}
-                            </button>
+                                    title={isSpanish ? "Not available in Spanish mode" : (!currentAssignment.contentSimple ? "No simplified version available" : "Toggle Text Complexity")}
+                                >
+                                    <SlidersHorizontal size={14} />
+                                    {isSimplified ? 'Simplified' : 'Simplify'}
+                                </button>
 
-                            <button
-                                onClick={toggleReadAloud}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-xs font-bold ${isReading ? 'bg-amber-100 text-amber-700 border-amber-200 animate-pulse' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'}`}
-                            >
-                                {isReading ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                                {isReading ? (isSpanish ? 'Detener Lectura' : 'Stop Reading') : (isSpanish ? 'Leer en Voz Alta' : 'Read Aloud')}
-                            </button>
+                                <button
+                                    onClick={toggleReadAloud}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-xs font-bold ${isReading ? 'bg-amber-100 text-amber-700 border-amber-200 animate-pulse' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'}`}
+                                >
+                                    {isReading ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                                </button>
+                            </div>
                         </div>
                     )}
 
