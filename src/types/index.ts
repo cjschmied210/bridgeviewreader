@@ -1,0 +1,150 @@
+
+// import { User } from 'firebase/auth'; // Removed unused import
+
+export type UserRole = 'student' | 'teacher';
+export type ReciprocalRole = 'Questioner' | 'Clarifier' | 'Summarizer' | 'Predictor';
+
+export interface UserProfile {
+    uid: string;
+    email: string;
+    displayName: string;
+    role: UserRole;
+    createdAt: number;
+}
+
+export interface Teacher extends UserProfile {
+    role: 'teacher';
+    school?: string;
+}
+
+export interface Class {
+    id: string;
+    name: string;
+    description?: string;
+    teacherId: string;
+    studentIds: string[];
+    createdAt: number | object; // Firestore Timestamp or number
+    assignments?: {
+        assignmentId: string;
+        dueDate?: string;
+        status: 'Active' | 'Archived';
+    }[];
+}
+
+export interface Assignment {
+    id: string;
+    title: string;
+    themeImageKeyword: string;
+    content: string;
+    contentEs?: string; // HTML content (Spanish)
+    contentSimple?: string; // HTML content (Simplified/Lexile-Adjusted)
+    description?: string;
+    imageUrl?: string; // Specific image URL to override keyword search
+}
+
+export interface AirlockData {
+    primingWords: string[];
+    knowledge: string;
+    curiosity: string;
+    role?: ReciprocalRole;
+}
+
+
+export interface AnnotationData {
+    id: string;
+    text: string; // The selected text
+    note: string; // The user's thought
+    tag: "I'm confused" | 'How/Why Question' | 'Self-Connection' | 'World-Connection';
+    createdAt?: any; // Firestore Timestamp or number
+}
+
+export interface HexagonTile {
+    id: string;
+    content: string; // The term/theme/character
+    type: 'Term' | 'Theme' | 'Character' | 'Evidence';
+    x: number;
+    y: number;
+}
+
+export interface HexConnection {
+    id: string;
+    tileId1: string;
+    tileId2: string;
+    justification: string; // The "Why"
+}
+
+export interface SynthesisData {
+    gist: string;
+    reflection3: string[];
+    reflection2: string[];
+    reflection1: string;
+    learned: string;
+    roleContribution?: {
+        role: ReciprocalRole;
+        content: string;
+    };
+    hexTiles?: HexagonTile[];
+    hexConnections?: HexConnection[];
+}
+
+export interface SpeedBumpData {
+    checkpointId: string; // Or index
+    reflection: string;
+}
+
+export interface Submission {
+    id: string;
+    assignmentId: string;
+    studentId: string;
+    classId: string;
+    airlockData: AirlockData;
+    annotations: AnnotationData[];
+    speedBumpReflections?: SpeedBumpData[]; // Added this
+    synthesis: SynthesisData;
+    submittedAt: number | object; // Firestore Timestamp
+    status: 'Pending' | 'In Progress' | 'Completed' | 'Revise';
+    grade?: string;
+    feedback?: string; // Legacy field, prefer teacherComment
+    teacherComment?: string;
+    gradedAt?: string;
+    teacherId?: string;
+    hasPendingRevision?: boolean;
+    revisionCount?: number;
+}
+
+export interface ClassStreamPost {
+    id: string;
+    assignmentId: string;
+    classId: string;
+    studentId: string;
+    studentName: string;
+    role: ReciprocalRole;
+    activeTool: 'Questioner' | 'Clarifier' | 'Summarizer' | 'Predictor'; // Matches role usually
+    content: string;
+    timestamp: any; // Firestore Timestamp
+    likes?: string[];
+    replies?: {
+        id: string;
+        authorId: string;
+        authorName: string;
+        content: string;
+        timestamp: any;
+    }[];
+}
+
+export type SkillType = 'Questioner' | 'Clarifier' | 'Summarizer' | 'Predictor' | 'DeepReader';
+
+export interface UserStats {
+    userId: string;
+    level: number;
+    totalXp: number;
+    skills: {
+        [key in SkillType]: {
+            xp: number;
+            level: number;
+            actions: number; // Count of actions taken (e.g. lookups)
+        }
+    };
+    badges: string[]; // URLs or IDs
+    lastActive: any;
+}
